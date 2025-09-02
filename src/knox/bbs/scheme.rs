@@ -9,6 +9,7 @@ use crate::knox::short_group_sig_core::short_group_traits::{
 };
 use crate::knox::short_group_sig_core::{ProofCommittedBuilder, ProofMessage};
 use crate::CredxResult;
+use blsful::inner_types::GroupEncoding;
 use blsful::inner_types::{Curve, G1Affine, G1Projective, Scalar};
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
@@ -93,6 +94,50 @@ impl ShortGroupSignatureScheme for BbsScheme {
         transcript.challenge_bytes(b"blind signature context challenge", &mut res);
         let challenge = Scalar::from_bytes_wide(&res);
         let proofs = committing.generate_proof(challenge, secrets.as_slice())?;
+        Ok((
+            BlindSignatureContext {
+                commitment,
+                challenge,
+                proofs,
+            },
+            Scalar::ZERO,
+        ))
+    }
+
+    fn new_blind_signature_context_with_secure_device(
+        link_secret_index: usize,
+        public_key: &Self::PublicKey,
+        nonce: Scalar,
+        secure_device: std::sync::Arc<dyn crate::secure_device::SecureDevice>,
+    ) -> CredxResult<(Self::BlindSignatureContext, Scalar)> {
+        if link_secret_index >= public_key.y.len() {
+            return Err(Error::General("invalid blind signing"));
+        }
+
+        let response = secure_device.commit_link_secret(public_key.y[link_secret_index])?;
+
+        let commitment = response.link_secret_commitment;
+        let random_commitment = response.random_link_secret_commitment;
+
+        let mut transcript = Transcript::new(b"new blind signature");
+        transcript.append_message(b"public key", public_key.to_bytes().as_ref());
+        transcript.append_message(b"generator", &G1Projective::GENERATOR.to_compressed());
+        transcript.append_message(
+            b"random commitment",
+            random_commitment.to_affine().to_bytes().as_ref(),
+        );
+        transcript.append_message(
+            b"blind commitment",
+            commitment.to_affine().to_compressed().as_ref(),
+        );
+        transcript.append_message(b"nonce", nonce.to_be_bytes().as_ref());
+        let mut res = [0u8; 64];
+        transcript.challenge_bytes(b"blind signature context challenge", &mut res);
+        let challenge = Scalar::from_bytes_wide(&res);
+
+        let proof = secure_device.finalize_proof_of_knowledge(challenge)?;
+        let proofs = vec![proof];
+
         Ok((
             BlindSignatureContext {
                 commitment,

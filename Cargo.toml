@@ -41,6 +41,7 @@ subtle = "2.6"
 uint-zigzag = { version = "0.2", features = ["std"] }
 uuid = {version = "1.11", features = ["v4"]}
 zeroize = "1"
+dashmap = "6.1.0"
 
 
 [dev-dependencies]

@@ -137,4 +137,13 @@ impl ShortGroupSignatureScheme for PsScheme {
 
         proof.verify(public_key, revealed_msgs, challenge).is_ok() && challenge == v_challenge
     }
+
+    fn new_blind_signature_context_with_secure_device(
+        link_secret_index: usize,
+        public_key: &Self::PublicKey,
+        nonce: Scalar,
+        secure_device: std::sync::Arc<dyn crate::secure_device::SecureDevice>,
+    ) -> CredxResult<(Self::BlindSignatureContext, Scalar)> {
+        todo!()
+    }
 }

@@ -1,6 +1,8 @@
+use crate::blind;
 use crate::knox::short_group_sig_core::short_group_traits::{
     BlindSignatureContext as _, ShortGroupSignatureScheme,
 };
+use crate::secure_device::SecureDevice;
 use crate::{
     claim::ClaimData,
     error::Error,
@@ -10,6 +12,7 @@ use crate::{
 use blsful::inner_types::*;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 /// A blind credential signing request
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -54,6 +57,41 @@ impl<S: ShortGroupSignatureScheme> BlindCredentialRequest<S> {
             Self {
                 blind_signature_context: ctx,
                 blind_claim_labels: claims.iter().map(|(l, _)| l.clone()).collect(),
+                nonce,
+            },
+            blinder,
+        ))
+    }
+
+    pub fn new_with_secure_device(
+        issuer: &IssuerPublic<S>,
+        secure_device: Arc<dyn SecureDevice>,
+    ) -> CredxResult<(Self, Scalar)> {
+        if !issuer.schema.blind_claims.contains("link_secret") {
+            // Link secret is required.
+            return Err(Error::InvalidClaimData("claim is not blindable"));
+        }
+
+        let link_secret_index = issuer
+            .schema
+            .claim_indices
+            .get_index_of("link_secret")
+            .ok_or(Error::InvalidClaimData(
+                "link_secret claim does not exist in schema",
+            ))?;
+
+        let nonce = Scalar::random(rand::thread_rng());
+        let (ctx, blinder) = S::new_blind_signature_context_with_secure_device(
+            link_secret_index,
+            &issuer.verifying_key,
+            nonce,
+            secure_device,
+        )?;
+
+        Ok((
+            Self {
+                blind_signature_context: ctx,
+                blind_claim_labels: vec!["link_secret".into()],
                 nonce,
             },
             blinder,

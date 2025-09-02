@@ -1,6 +1,7 @@
 //! Traits for abstracting public keys, secret keys, signatures, blind signatures,
 //! and zero-knowledge proofs of message and signature knowledge
 use crate::knox::short_group_sig_core::ProofMessage;
+use crate::secure_device::SecureDevice;
 use crate::CredxResult;
 use blsful::inner_types::{Group, GroupEncoding, Scalar};
 use elliptic_curve::Field;
@@ -10,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::num::NonZeroUsize;
+use std::sync::Arc;
 
 /// Trait for abstracting public keys
 pub trait PublicKey: Sized + Clone + Debug + Serialize + for<'de> Deserialize<'de> {
@@ -202,6 +204,15 @@ pub trait ShortGroupSignatureScheme:
         public_key: &Self::PublicKey,
         nonce: Scalar,
         rng: impl RngCore + CryptoRng,
+    ) -> CredxResult<(Self::BlindSignatureContext, Scalar)>;
+
+    /// Create the structures need to send to an issuer to complete a blinded signature
+    /// `messages` is an index to message map where the index corresponds to the index in `generators` by using secure device
+    fn new_blind_signature_context_with_secure_device(
+        link_secret_index: usize,
+        public_key: &Self::PublicKey,
+        nonce: Scalar,
+        secure_device: Arc<dyn SecureDevice>,
     ) -> CredxResult<(Self::BlindSignatureContext, Scalar)>;
 
     /// Create a new signature proof of knowledge and selective disclosure proof

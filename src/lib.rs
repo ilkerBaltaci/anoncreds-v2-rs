@@ -34,6 +34,9 @@ use crate::knox::Knox;
 pub use indexmap;
 pub use regex;
 
+/// Secure Device Integration Definitions
+pub mod secure_device;
+
 /// The blind credential operations
 pub mod blind;
 /// Claim related methods
